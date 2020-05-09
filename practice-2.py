@@ -57,7 +57,7 @@ pygame.mixer.music.play()
 clock = pygame.time.Clock()
 
 class Bullet:
-    def __init__(self, x, y, type, angle=0):
+    def __init__(self, x, y, type, angle=0, fromEnemy=False):
         #   type: bullet variant
         #       0 = default
         #   count: how long bullet remains on screen (in frames)
@@ -140,7 +140,13 @@ class Bullet:
             self.sizeY = 10
             self.damage = 50
 
+        self.fromEnemy = fromEnemy
         self.hit = False
+
+        if fromEnemy:
+            self.speed = -self.speed
+            self.x = x
+            self.y = y + 20
         
         # center of bullet
         self.centerX = self.x + (self.sizeX/2)
@@ -169,7 +175,7 @@ class Bullet:
         self.centerY = self.y + (self.sizeX/2)
 
         # checks if bullet is within play area
-        if self.centerX > screenWidth:
+        if self.centerX > screenWidth or self.centerX < 0:
             if self.type != 3:
                 self.count = 0
             else:
@@ -275,6 +281,15 @@ class Enemy:
         self.centerY = self.y + (self.height/2)
         self.endX = self.x + self.width
         self.endY = self.y + self.height
+
+        self.cooldown -= 1
+        if self.cooldown == 0:
+            bullets.bullets.append(Bullet(self.x, self.y, 2, -.6, True))
+            bullets.bullets.append(Bullet(self.x, self.y, 2, -.3, True))
+            bullets.bullets.append(Bullet(self.x, self.y, 2, 0, True))
+            bullets.bullets.append(Bullet(self.x, self.y, 2, .3, True))
+            bullets.bullets.append(Bullet(self.x, self.y, 2, .6, True))
+            self.cooldown = 50
 
         if self.progress >= self.maxProgress or self.progress <= 0:
             self.speed = -self.speed
@@ -487,7 +502,7 @@ class EnemyCollisions():
             else:
                 for enemy in enemies.enemies:
                     # ensures one collision per bullet and that it only collides with enemies still alive
-                    if not bullet.hit and enemy.isAlive:
+                    if not bullet.hit and enemy.isAlive and not bullet.fromEnemy:
                         # checks if bullet is within enemy's X values
                         if bullet.centerX > enemy.startX:
                             if bullet.centerX < enemy.endX:
@@ -502,6 +517,13 @@ class EnemyCollisions():
                                         if enemy.health <= 0:
                                             enemy.isAlive = False
                                             impacts.impacts.append(Impact(enemy.centerX, enemy.centerY, 0))
+                    elif not bullet.hit and bullet.fromEnemy:
+                        if bullet.centerX > player.x:
+                            if bullet.centerX < player.x + player.sizeX:
+                                if bullet.centerY > player.y:
+                                    if bullet.centerY < player.y + player.sizeY:
+                                        bullet.hit = True
+                                        impacts.impacts.append(Impact(player.x + player.sizeX/2, player.y + player.sizeY/2, 0))
 
         num = 0
         while num < len(bullets.bullets):
@@ -598,7 +620,6 @@ while not done:
         screen.fill((160, 160, 160))
 
         pressed = pygame.key.get_pressed()
-
 
         player.move(pressed)
         enemies.move()
