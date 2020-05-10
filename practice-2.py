@@ -1,6 +1,7 @@
 import pygame
 import os
 import math
+import random
 from pathlib import Path
 
 #   tutorial used: https://nerdparadise.com/programming/pygame/part2
@@ -326,6 +327,58 @@ class Enemy:
             self.curFrame += self.animateInterval
 '''
 
+class Item:
+    def __init__(self, x, y, itemType, typeVariant):
+        def gunItem():
+            self.itemType = 'gun'
+            def machineGun():
+                self.gunType = 0
+                self.graphic = "item-machine-gun.png"
+            def shotgun():
+                self.gunType = 2
+                self.graphic = "item-shotgun.png"
+            def laser():
+                self.gunType = 3
+                self.graphic = "item-laser.png"
+
+            tVariant = {
+            0 : machineGun,
+            2 : shotgun,
+            3 : laser
+            }
+            tVariant[typeVariant]()
+        def upgradeItem():
+            print("YEET")
+
+        self.speed = 3
+
+        self.sizeX = 32
+        self.sizeY = 32
+
+        self.x = x - self.sizeX/2
+        self.y = y - self.sizeY/2
+
+        self.centerX = self.x + (self.sizeX/2)
+        self.centerY = self.y + (self.sizeY/2)
+
+        self.pickedUp = False
+        self.inBounds = True
+
+        iType = {
+            'gun' : gunItem,
+            'upg' : upgradeItem
+        }
+        iType[itemType]()
+
+    def move(self):
+        if self.x < 0:
+            self.inBounds = False
+        else:
+            self.x = self.x - self.speed
+            self.centerX = self.x + (self.sizeX/2)
+            self.centerY = self.y + (self.sizeY/2)
+
+
 # individual impact data, including impact/explosionn types and animation progress
 class Impact:
     # x: enemy's center x
@@ -392,6 +445,12 @@ class Player():
 
         # value for checking if player's gun can be fired
         self.mainGunCD = 0
+
+        self.centerX = self.x + self.sizeX/2
+        self.centerY = self.y + self.sizeY/2
+
+        self.endX = self.x + self.sizeX
+        self.endY = self.y + self.sizeY
     
     # player movement and action checks for each frame
     def move(self, pressed):
@@ -411,6 +470,12 @@ class Player():
         if self.y > screenHeight - self.sizeY:
             self.y = screenHeight - self.sizeY
 
+        self.centerX = self.x + self.sizeX/2
+        self.centerY = self.y + self.sizeY/2
+
+        self.endX = self.x + self.sizeX
+        self.endY = self.y + self.sizeY
+
         # main gun actions
         self.mainGun.move(pressed, self.x, self.y)
 
@@ -427,6 +492,8 @@ class Graphics():
         for b in bullets.bullets:
             screen.blit(get_image(b.graphic), (b.x, b.y))
         for i in impacts.impacts:
+            screen.blit(get_image(i.graphic), (i.x, i.y))
+        for i in items:
             screen.blit(get_image(i.graphic), (i.x, i.y))
         for b in bars.bars:
             pygame.draw.rect(screen, (0, 0, 0), (b[3] - 1, b[4] - 1, b[8] + 2, b[6] + 2), 0)
@@ -483,18 +550,20 @@ class Impacts():
             num += 1
 
 # bullets/enemy collision checker; checks for every frame
-class EnemyCollisions():
+class collisionChecker():
+
     def check(self):
+        checkResult = []
         # checks each bullet for any possible collisions
         for bullet in bullets.bullets:
             # cycles through all enemies for each bullet
             if bullet.type == 3:
                 for enemy in enemies.enemies:
                     if enemy.isAlive:
-                        if enemy.x > bullet.x:
-                            if enemy.y < bullet.y:
-                                if enemy.x < bullet.endX:
-                                    if enemy.y > bullet.endY:
+                        if bullet.x < enemy.centerX:
+                            if bullet.endX > enemy.centerX:
+                                if bullet.y < enemy.centerY:
+                                    if bullet.endY > enemy.centerY:
                                         enemy.health -= bullet.damage
                                         if enemy.health <= 0:
                                             enemy.isAlive = False
@@ -525,6 +594,8 @@ class EnemyCollisions():
                                         bullet.hit = True
                                         impacts.impacts.append(Impact(player.x + player.sizeX/2, player.y + player.sizeY/2, 0))
 
+                              
+
         num = 0
         while num < len(bullets.bullets):
             if bullets.bullets[num].hit == True:
@@ -537,9 +608,40 @@ class EnemyCollisions():
         while num < len(enemies.enemies):
             if enemies.enemies[num].isAlive == False:
                 play_sound(enemies.enemies[num].deathSound)
+                checkResult.append({
+                    'type' : 'death',
+                    'centerX' : enemy.centerX,
+                    'centerY' : enemy.centerY
+                })
                 del enemies.enemies[num]
                 num -= 1
             num += 1
+
+        return checkResult
+
+    def itemCheck(self, items):
+        try:
+            for i in items:
+                if i.centerX < player.endX:
+                    if i.centerX > player.x:
+                        if i.centerY > player.y:
+                            if i.centerY < player.endY:
+                                if i.itemType == 'gun':
+                                    player.mainGun = Gun(i.gunType)
+                                i.pickedUp = True
+
+            # gets rid of items that have been picked up or have gotten out of bounds
+            i = 0
+            while i in range(len(items)):
+                if not items[i].inBounds or items[i].pickedUp:
+                    del items[i]
+                    i -= 1
+                i += 1
+                    
+                                
+        except Exception as e:
+            print(e)
+        return items
 
 # stores data for health bar graphics for each enemy
 class Bars():
@@ -595,7 +697,9 @@ enemies = Enemies()
 impacts = Impacts()
 bars = Bars()
 
-enemyCollisions = EnemyCollisions()
+items = []
+
+collisionChecker = collisionChecker()
 
 
 while not done:
@@ -609,6 +713,9 @@ while not done:
                     player.mainGun = Gun(player.mainGun.type + 1)
                 else:
                     player.mainGun = Gun(0)
+
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
+                items.append(Item(player.x + 600, player.y, 'gun', 2))
 
             # spawns enemy with C
             if event.type == pygame.KEYDOWN:
@@ -624,7 +731,29 @@ while not done:
         player.move(pressed)
         enemies.move()
         bullets.move()
-        enemyCollisions.check()
+        try:
+            for i in items:
+                i.move()
+            items = collisionChecker.itemCheck(items)
+        except Exception as e:
+            print(e)
+
+        result = collisionChecker.check()
+
+        try:
+            for r in result:
+                if r['type'] == 'death':
+                    dropDeterminer = random.randint(0, 50)
+                    if dropDeterminer < 5:
+                        gunType = random.choice([0, 2, 3])
+                        items.append(Item(r['centerX'], r['centerY'], 'gun', gunType))
+
+            result = []
+
+        except Exception as e:
+            print(e)
+
+        
 
         impacts.move()
 
