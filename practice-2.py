@@ -36,13 +36,14 @@ def play_sound(path):
             _sound_library[path] = sound
     sound.play()
 
-#   sets current working directory to where the code is being run from
+# sets current working directory to where the code is being run from
 os.chdir(Path(__file__).resolve().parent)
 
 pygame.mixer.pre_init(44100, -16, 1, 512)
 pygame.init()
 
-pygame.init()
+# Game title (Remember to CHANGE AT SOME POINT)
+pygame.display.set_caption('Epic Game')
 
 screenWidth = 768
 screenHeight = 432
@@ -482,19 +483,38 @@ class Player():
 class Graphics():
     def __init__(self):
         self.blah = 0
+        self.bgGraphic = "background-test.png"
+        self.bgW, self.bgH = get_image(self.bgGraphic).get_size()
+        self.bg_rect = get_image(self.bgGraphic).get_rect()
+
+        self.bgX = 0
+        self.bgY = 0
 
     def blit(self):
+        # looping background
+        for num in range(2):
+            self.bgX -= .5
+            if self.bgX <= -self.bgW:
+                self.bgX = 0
+            screen.blit(get_image(self.bgGraphic), (self.bgX, self.bgY))
+            screen.blit(get_image(self.bgGraphic), (self.bgX + self.bgW, self.bgY))
+
         screen.blit(get_image(player.graphic), (player.x, player.y))
+
         num = 0
         while num in range (len(enemies.enemies)):
             screen.blit(get_image(enemies.enemies[num].graphic), (enemies.enemies[num].x, enemies.enemies[num].y))
             num += 1
+
         for b in bullets.bullets:
             screen.blit(get_image(b.graphic), (b.x, b.y))
+
         for i in impacts.impacts:
             screen.blit(get_image(i.graphic), (i.x, i.y))
+
         for i in items:
             screen.blit(get_image(i.graphic), (i.x, i.y))
+
         for b in bars.bars:
             pygame.draw.rect(screen, (0, 0, 0), (b[3] - 1, b[4] - 1, b[8] + 2, b[6] + 2), 0)
             pygame.draw.rect(screen, (255, 255, 255), (b[3] - 1, b[4] - 1, b[8] + 2, b[6] + 2), 1)
@@ -707,13 +727,14 @@ while not done:
             if event.type == pygame.QUIT:
                 done = True
 
-            #switch guns with Z
+            # switch guns with Z
             if event.type == pygame.KEYDOWN and event.key == pygame.K_z:
                 if player.mainGun.type < 3:
                     player.mainGun = Gun(player.mainGun.type + 1)
                 else:
                     player.mainGun = Gun(0)
 
+            # spawns item drops with Q
             if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
                 items.append(Item(player.x + 600, player.y, 'gun', 2))
 
@@ -738,10 +759,13 @@ while not done:
         except Exception as e:
             print(e)
 
+        # checks for bullets that have collided with enemies or the player and distributes damage caused
+        # result contains info used for item drop calculations
         result = collisionChecker.check()
 
         try:
             for r in result:
+                # if enemy died, possibility of item drop
                 if r['type'] == 'death':
                     dropDeterminer = random.randint(0, 50)
                     if dropDeterminer < 5:
@@ -753,12 +777,12 @@ while not done:
         except Exception as e:
             print(e)
 
-        
-
         impacts.move()
 
+        # calculates health bar information for all enemies that are alive
         bars.get()
 
+        #creates all the graphics
         graphics.blit()
 
         # updates game screen
